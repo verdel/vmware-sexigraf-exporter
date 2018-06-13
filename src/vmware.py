@@ -96,8 +96,7 @@ class vCenter(object):
 
     def get_vm_vd_iops(self, vm, moref, interval=20, count=15):
         vm_hardware = vm['config.hardware']
-        vmNumReadAvg = 0
-        vmNumWriteAvg = 0
+        vmNumAvg = 0
         for each_vm_hardware in vm_hardware.device:
             if (each_vm_hardware.key >= 2000) and (each_vm_hardware.key < 3000):
                 statVirtualdiskIORead = self.build_perf_query(self.vchtime,
@@ -107,7 +106,6 @@ class vCenter(object):
                                                               interval,
                                                               count)
                 VirtualdiskIORead = (sum(statVirtualdiskIORead[0].value[0].value)) / count
-                vmNumReadAvg += VirtualdiskIORead
 
                 statVirtualdiskIOWrite = self.build_perf_query(self.vchtime,
                                                                self.stat_check(self.perf_dict, 'virtualDisk.numberWriteAveraged.average'),
@@ -116,8 +114,9 @@ class vCenter(object):
                                                                interval,
                                                                count)
                 VirtualdiskIOWrite = (sum(statVirtualdiskIOWrite[0].value[0].value)) / count
-                vmNumWriteAvg += VirtualdiskIOWrite
-        return vmNumReadAvg + vmNumReadAvg
+
+                vmNumAvg += (VirtualdiskIORead + VirtualdiskIOWrite)
+        return vmNumAvg
 
     def get_vm_ds_iops(self, vm, moref, interval=20, count=15):
         vm_hardware = vm['config.hardware']
@@ -146,8 +145,6 @@ class vCenter(object):
                         continue
                     DatastoreIOWrite = (sum(statDatastoreIOWrite[0].value[0].value)) / count
 
-                    if each_vm_hardware.backing.datastore.summary.name in data:
-                        data[each_vm_hardware.backing.datastore.summary.name] += (DatastoreIORead + DatastoreIOWrite)
-                    else:
+                    if each_vm_hardware.backing.datastore.summary.name not in data:
                         data[each_vm_hardware.backing.datastore.summary.name] = (DatastoreIORead + DatastoreIOWrite)
         return data
