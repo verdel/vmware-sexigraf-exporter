@@ -92,6 +92,14 @@ class vCenter(object):
                                                                             vm['summary.runtime.host'].parent.name.replace('.', '_').lower(),
                                                                             key.replace('.', '_').lower(),
                                                                             vm['name'].replace('.', '_')): value})
+
+                get_vm_ds_latency = self.get_vm_ds_latency(vm, vm['obj'])
+                for key, value in get_vm_ds_latency.items():
+                    data.update({'{}.{}.{}.datastore.{}.{}.LatencyAvg'.format(self.server.replace('.', '_'),
+                                                                              vm['summary.runtime.host'].parent.parent.parent.name.replace('.', '_'),
+                                                                              vm['summary.runtime.host'].parent.name.replace('.', '_').lower(),
+                                                                              key.replace('.', '_').lower(),
+                                                                              vm['name'].replace('.', '_')): value})
         return data
 
     def get_vm_vd_iops(self, vm, moref, interval=20, count=15):
@@ -147,4 +155,35 @@ class vCenter(object):
 
                     if each_vm_hardware.backing.datastore.summary.name not in data:
                         data[each_vm_hardware.backing.datastore.summary.name] = (DatastoreIORead + DatastoreIOWrite)
+        return data
+
+    def get_vm_ds_latency(self, vm, moref, interval=20, count=15):
+        vm_hardware = vm['config.hardware']
+        data = {}
+        for each_vm_hardware in vm_hardware.device:
+            if (each_vm_hardware.key >= 2000) and (each_vm_hardware.key < 3000):
+                if each_vm_hardware.backing.datastore.summary.type != "vsan":
+                    statDatastoreLatencyRead = self.build_perf_query(self.vchtime,
+                                                                     self.stat_check(self.perf_dict, 'datastore.totalReadLatency.average'),
+                                                                     each_vm_hardware.backing.datastore.info.vmfs.uuid,
+                                                                     moref,
+                                                                     interval,
+                                                                     count)
+                    if not statDatastoreLatencyRead:
+                        continue
+
+                    DatastoreLatencyRead = (sum(statDatastoreLatencyRead[0].value[0].value)) / count
+
+                    statDatastoreLatencyWrite = self.build_perf_query(self.vchtime,
+                                                                      self.stat_check(self.perf_dict, 'datastore.totalWriteLatency.average'),
+                                                                      each_vm_hardware.backing.datastore.info.vmfs.uuid,
+                                                                      moref,
+                                                                      interval,
+                                                                      count)
+                    if not statDatastoreLatencyWrite:
+                        continue
+                    DatastoreLatencyWrite = (sum(statDatastoreLatencyWrite[0].value[0].value)) / count
+
+                    if each_vm_hardware.backing.datastore.summary.name not in data:
+                        data[each_vm_hardware.backing.datastore.summary.name] = (DatastoreLatencyRead + DatastoreLatencyWrite)
         return data
